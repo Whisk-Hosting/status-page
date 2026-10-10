@@ -1,0 +1,37 @@
+# The live demo only (npm run deploy:demo). The same app as ../whisk.yaml with every route public,
+# every POST behind the bot challenge, DEMO=1 and the nightly reset. See src/demo.ts.
+whisk: 1
+name: status
+
+routes:
+  public: ["/**"]
+  # Not /api/**: scripts can't solve a challenge. The API still needs a key, which the guest can
+  # make under Manage > Settings.
+  challenge: ["/subscribe", "/subscribe/**", "/unsubscribe/**", "/demo/**", "/admin/**"]
+
+health:
+  path: /health
+  timeout: 60
+
+database: app
+migrate: "node dist/migrate.js"
+
+storage: true
+email: true
+
+functions:
+  - name: notify-subscribers
+    event: update.posted
+    graph: workflows/notify-subscribers.graph.yaml
+  - name: tidy
+    cron: "30 3 * * *"
+    tz: America/New_York
+    graph: workflows/tidy.graph.yaml
+  - name: demo-reset
+    cron: "0 3 * * *"
+    tz: America/New_York
+    graph: workflows/demo-reset.graph.yaml
+
+env:
+  LOG_LEVEL: info
+  DEMO: "1"

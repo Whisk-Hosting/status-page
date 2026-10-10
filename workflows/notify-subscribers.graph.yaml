@@ -1,0 +1,9 @@
+steps:
+  - id: queue
+  - id: send-batch
+    next: more?
+  - id: more?
+    branches: { yes: pace, no: end }
+  - id: pace
+    kind: sleep
+    next: send-batch

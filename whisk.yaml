@@ -1,0 +1,36 @@
+whisk: 1
+name: status
+
+routes:
+  # The status page, incidents, history, feeds, JSON and subscribing are open to anyone. The
+  # staff screens under /admin need a signed-in person from the business's team. /api/v1 checks
+  # its own keys.
+  public: ["/", "/health", "/incidents/*", "/history", "/history/*", "/subscribe", "/subscribe/**", "/unsubscribe/*", "/feed.atom", "/badge.svg", "/api/**", "/assets/**"]
+  # Subscribing, confirming and unsubscribing need the bot challenge solved first.
+  challenge: ["/subscribe", "/subscribe/**", "/unsubscribe/*"]
+
+health:
+  path: /health
+  timeout: 60
+
+database: app
+migrate: "node dist/migrate.js"
+
+# The logo is uploaded to storage and served resized by Whisk.
+storage: true
+
+# Confirmation and update emails, from the business's own domain once it is verified in Whisk.
+email: true
+
+functions:
+  - name: notify-subscribers
+    event: update.posted
+    graph: workflows/notify-subscribers.graph.yaml
+  # Drops addresses that never confirmed. Set tz to where you are.
+  - name: tidy
+    cron: "30 3 * * *"
+    tz: UTC
+    graph: workflows/tidy.graph.yaml
+
+env:
+  LOG_LEVEL: info
