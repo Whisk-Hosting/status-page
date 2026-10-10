@@ -1,64 +1,102 @@
 # Status page
 
-A self-hosted status page for your business: components with 90-day uptime bars, incidents with
-a timeline of updates, scheduled maintenance, email subscribers, an Atom feed and an API your
-monitors can use. It does what most people pay Atlassian Statuspage or Instatus for, and runs on
-[Whisk](https://whisk.run) as one app.
+A status page for your business: components with 90-day uptime bars, incidents with a timeline of
+updates, scheduled maintenance, email subscribers, an Atom feed and an API your monitors can use.
+It replaces Atlassian Statuspage or Instatus for most small businesses.
 
-**Live demo:** https://status.examples.whisk.page. Press **Look around** to manage it;
-it resets every night.
+![The public status page: a Degraded performance banner, an open incident being monitored and an upcoming maintenance window](docs/screenshots/desktop.webp)
 
-## What it does
+**[See it live](https://status.examples.whisk.page)**. The status page is open to everyone. Press
+**Look around** to manage it as staff. It resets every night.
 
-- **The page** answers "is it up?" at a glance: a banner (All systems operational, Degraded
-  performance, Partial outage, Major outage, Under maintenance), open incidents, upcoming
-  maintenance, components in groups with 90 days of uptime (30 on a phone), and the last two
-  weeks of incidents. Hover or tap a bar to see that day. Dark mode follows the device.
-- **Incidents** go through Investigating, Identified, Monitoring and Resolved. Each update can
-  change the status of the components it affects and email subscribers. Every incident has its
-  own page, and the history goes back month by month.
-- **Maintenance** is scheduled as a window. It shows as upcoming, then in progress, then
-  completed, worked out from the times, so nobody has to remember to flip it. Components in a
-  window show as Under maintenance while it runs.
-- **Uptime** comes from the history of component statuses: a major outage counts as down and a
-  partial outage as 30 % down, as Statuspage counts it.
-- **Subscribers** confirm by email and can unsubscribe from any email. Emails go out in the
-  background, paced under Whisk's sending limit, and the staff timeline shows how many went.
-- **Your brand**: name, logo, color, website and contact links, time zone, and your own domain
-  through Whisk.
-- **Machine-readable**: `/feed.atom`, `/badge.svg`, and `/api/v2/status.json` and
-  `/api/v2/summary.json` in Atlassian Statuspage's format, so tools that read Statuspage read this.
-- **API** (`/api/v1`) with keys made under Manage > Settings: set a component's status, open an
-  incident, post an update. This is how an uptime monitor or a deploy script plugs in.
-- **Staff** are the business's Whisk team. Everyone on it can post incidents and change
-  components; owners, admins and the `status-admins` group also manage subscribers, settings and
-  API keys. The rules are two lines in `src/whisk.ts`.
+## Deploy your own
 
-## Get your own
+Paste this into Claude Code, Codex, Cursor or any coding agent:
 
-Copy this one as it is:
+> Read https://whisk.run/skill. Then clone https://github.com/Whisk-Hosting/status-page, deploy it to Whisk as a new app, and give me its address.
+
+Your agent signs you up to Whisk if you're new, deploys the app, and gives you its address. It
+comes with sample data so every screen has something to show.
+
+Once it's live, ask your agent to make it yours in plain words, for example:
+
+> Change the name to Maple Street Dental and use our logo and our blue.
+>
+> Replace the sample components with our website, online booking and phone line.
+>
+> Post a message to our Slack channel whenever an incident is opened or resolved.
+
+Prefer the command line?
 
 ```
-git clone https://github.com/whisk-hosting/status-page && cd status-page
+git clone https://github.com/Whisk-Hosting/status-page && cd status-page
 whisk init --name status
 whisk deploy -m "Set up the status page"
 ```
 
-Or give your coding agent this prompt:
+## What is Whisk?
 
-> Deploy the status page example from https://github.com/whisk-hosting/status-page to my Whisk
-> account as an app called "status". Then open Manage > Settings and set the name to our
-> business name, and replace the sample components with ours: [list them].
+[Whisk](https://whisk.run) hosts business apps built with AI coding agents. Your agent creates the
+account, pushes the app, and it's live at its own address with sign-in, a database, backups,
+scheduled jobs, email and security already taken care of. This app is one of the
+[Whisk examples](https://whisk.run/examples): open source, MIT licensed, and yours to change.
 
-Build your own version from it:
+## Screenshots
 
-> Using https://github.com/whisk-hosting/status-page as the starting point, build a status page
-> for [business]. Our customers care about [the parts of the service]. Keep the functional style
-> (pure decisions in src/model.ts, table-tested), and add [what you need, such as Slack alerts
-> or a private page for one customer].
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/uptime.webp" width="400" alt="Components in groups, each with 90 days of uptime bars and a tooltip for one day"><br>90 days of uptime per component</td>
+    <td width="33%"><img src="docs/screenshots/incident.webp" width="400" alt="An incident page with its Investigating, Identified and Monitoring updates"><br>Every incident has its own timeline</td>
+    <td width="33%"><img src="docs/screenshots/admin.webp" width="400" alt="The staff screen with component status menus and open incidents"><br>Staff change statuses in one place</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/admin-incident.webp" width="400" alt="Managing a maintenance window: post an update, email subscribers, edit times and components"><br>Post updates and email subscribers</td>
+    <td><img src="docs/screenshots/settings.webp" width="400" alt="Settings for name, logo, color and time zone, with API keys and links to the feed, badge and JSON"><br>Your brand, API keys and feeds</td>
+    <td>
+      <img src="docs/screenshots/phone.webp" width="140" alt="The status page on a phone">
+      <img src="docs/screenshots/phone-incident.webp" width="140" alt="An incident timeline on a phone"><br>On a phone
+    </td>
+  </tr>
+</table>
 
-The first deploy adds a sample page for a made-up business so every screen has something to show.
-Rename or delete it all under **Manage**.
+## Features
+
+**The page**
+- A banner answers "is it up?" at a glance: All systems operational, Degraded performance,
+  Partial outage, Major outage or Under maintenance.
+- Open incidents, upcoming maintenance, and components in groups with 90 days of uptime (30 on a
+  phone). Hover or tap a bar to see that day.
+- The last two weeks of incidents, and a history that goes back month by month. Dark mode follows
+  the device.
+
+**Incidents and maintenance**
+- Incidents go through Investigating, Identified, Monitoring and Resolved. Each update can change
+  the status of the components it affects and email subscribers.
+- Maintenance is a window that shows as upcoming, in progress, then completed, worked out from the
+  times. Components in a running window show as Under maintenance.
+
+**Uptime**
+- Worked out from the history of component statuses: a major outage counts as down and a partial
+  outage as 30 % down, as Statuspage counts it.
+
+**Subscribers**
+- People confirm by email and can unsubscribe from any email.
+- Emails go out in the background, paced under Whisk's sending limit, and the staff timeline shows
+  how many went.
+
+**Your brand**
+- Name, logo, color, website and contact links, time zone, and your own domain through Whisk.
+
+**For machines**
+- `/feed.atom`, `/badge.svg`, and `/api/v2/status.json` and `/api/v2/summary.json` in Atlassian
+  Statuspage's format, so tools that read Statuspage read this.
+- An API (`/api/v1`) with keys made under Manage > Settings: set a component's status, open an
+  incident, post an update. This is how an uptime monitor or a deploy script plugs in.
+
+**Staff**
+- Staff are the business's Whisk team. Everyone on it can post incidents and change components.
+- Owners, admins and the `status-admins` group also manage subscribers, settings and API keys. The
+  rules are two lines in `src/whisk.ts`.
 
 ## API
 
@@ -84,7 +122,7 @@ Statuses are `operational`, `degraded`, `partial` and `major`. Incident states a
 `investigating`, `identified`, `monitoring` and `resolved`. `"notify": false` posts without
 emailing subscribers. Errors are `{"error": {"code", "message", "fix"}}`.
 
-## How it is built
+## How it's built
 
 Hono on Node, Postgres through `postgres`, no front-end framework. Pages render on the server; a
 small script adds the uptime tooltips, the bot challenge and the logo upload. Decisions are pure
