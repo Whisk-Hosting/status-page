@@ -26,6 +26,7 @@ const flashes: Readonly<Record<string, string>> = {
   removed: "Removed.",
   revoked: "Key turned off.",
   statuses: "Statuses saved.",
+  checked: "Checked.",
 };
 export const flash = (c: Context) => flashes[c.req.query("ok") ?? ""];
 

@@ -2,10 +2,12 @@
 // every route here checks the person is on the business's team; subscribers, settings and keys
 // also need an owner or admin (whisk.ts says who).
 import type { Context, Hono } from "hono";
+import { runChecks } from "../checks.js";
 import { demoOn } from "../demo.js";
 import { changedStatuses, newIncident, newUpdate, windowFrom } from "../forms.js";
 import { loadPage } from "../load.js";
 import { cleanEmail, cleanUrl, isColor, isTimeZone, isOpen, move, sections } from "../model.js";
+import { DEMO_HOSTS, monitorFrom } from "../monitor.js";
 import { announce } from "../notify.js";
 import * as store from "../store.js";
 import { componentsPage, incidentList, manageIncident, newIncidentPage, overview, settingsPage, subscribersPage } from "../views/admin.js";
@@ -158,8 +160,20 @@ export const adminRoutes = (app: Hono) => {
   // ----- Components -----
 
   const componentsView = async (c: Context, error?: string) => {
-    const [groups, comps] = await Promise.all([store.groups(), store.components()]);
-    return render(c, "Components", componentsPage({ admin: canAdmin(who(c)), flash: flash(c), error, groups, comps, sections: sections(groups, comps) }), {
+    const [groups, comps, monitors, checks, s] = await Promise.all([store.groups(), store.components(), store.monitors(), store.recentChecks(30), store.settings()]);
+    const body = componentsPage({
+      admin: canAdmin(who(c)),
+      flash: flash(c),
+      error,
+      groups,
+      comps,
+      sections: sections(groups, comps),
+      monitors: new Map(monitors.map((m) => [m.component_id, m])),
+      checks,
+      tz: s.time_zone,
+      now: new Date(),
+    });
+    return render(c, "Components", body, {
       staff: true,
       status: error ? 400 : 200,
     });
@@ -199,6 +213,28 @@ export const adminRoutes = (app: Hono) => {
     const sibs = (await store.components()).filter((x) => x.group_id === comp.group_id).map((x) => x.id);
     await store.reorder("components", move(sibs, comp.id, dir));
     return c.redirect("/admin/components", 303);
+  });
+
+  // A component's monitor: the address to check, saved, removed, or checked at once.
+  app.post("/admin/components/:id/monitor", async (c) => {
+    const comp = await store.componentById(idParam(c));
+    if (!comp) return notFound(c);
+    const r = monitorFrom(await form(c), demoOn() ? DEMO_HOSTS : undefined);
+    if (!r.ok) return componentsView(c, r.error);
+    await store.saveMonitor(comp.id, r.value);
+    if (!r.value.paused) await runChecks(comp.id);
+    return c.redirect("/admin/components?ok=saved", 303);
+  });
+  app.post("/admin/components/:id/monitor/delete", async (c) => {
+    const comp = await store.componentById(idParam(c));
+    if (comp) await store.deleteMonitor(comp.id);
+    return c.redirect("/admin/components?ok=removed", 303);
+  });
+  app.post("/admin/components/:id/monitor/check", async (c) => {
+    const comp = await store.componentById(idParam(c));
+    if (!comp) return notFound(c);
+    await runChecks(comp.id);
+    return c.redirect("/admin/components?ok=checked", 303);
   });
 
   app.post("/admin/groups", async (c) => {

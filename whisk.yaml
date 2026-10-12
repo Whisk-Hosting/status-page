@@ -26,6 +26,11 @@ functions:
   - name: notify-subscribers
     event: update.posted
     graph: workflows/notify-subscribers.graph.yaml
+  # Checks each component that has a monitor (Manage > Components). Every three minutes; on the
+  # Free plan Whisk spaces it to every ten.
+  - name: monitor
+    cron: "0-59/3 * * * *"
+    graph: workflows/monitor.graph.yaml
   # Drops addresses that never confirmed. Set tz to where you are.
   - name: tidy
     cron: "30 3 * * *"

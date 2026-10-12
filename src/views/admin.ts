@@ -18,6 +18,7 @@ import {
   type Status,
   type Update,
 } from "../model.js";
+import { averageMs, checksUptime, monitorLabel, SLOW_MS, type Check, type Monitor } from "../monitor.js";
 import type { ApiKey, EmailRow, Settings, Subscriber } from "../store.js";
 import { icon } from "./icons.js";
 import { notice, type Html } from "./layout.js";
@@ -242,7 +243,70 @@ ${notice(p.flash)}${notice(p.error, "error")}
 
 // ----- Components -----
 
-export const componentsPage = (p: { admin: boolean; flash?: string; error?: string; groups: readonly Group[]; sections: readonly Section[]; comps: readonly Component[] }) => {
+// ----- Monitors -----
+
+const monitorClass = { up: "s-operational", slow: "s-degraded", down: "s-major" } as const;
+
+// The last checks, oldest first, as bars as tall as the answer was slow; failures in red.
+const checkBars = (cs: readonly Check[]) => {
+  const top = Math.max(500, ...cs.map((c) => c.ms ?? 0));
+  return html`<div class="checks" aria-hidden="true">${[...cs].reverse().map(
+    (c) => html`<i class="${c.ok ? "s-operational" : "s-major"}" style="height:${c.ok && c.ms !== null ? Math.max(12, Math.round((c.ms / top) * 100)) : 100}%"></i>`,
+  )}</div>`;
+};
+
+// One line under a monitored component: Up · 182 ms · 99.8 % · checked at 3:12 pm.
+const monitorLine = (m: Monitor, cs: readonly Check[], tz: string, now: Date) => {
+  const last = cs[0];
+  const avg = averageMs(cs);
+  const up = checksUptime(cs);
+  return html`<div class="monitor">
+    ${checkBars(cs)}
+    <div class="row muted" style="gap:8px;font-size:.85rem">
+      ${m.paused
+        ? html`<span class="pill s-none">Paused</span>`
+        : html`<span class="pill ${monitorClass[m.state]}">${monitorLabel[m.state]}</span>`}
+      ${last && !last.ok ? html`<span>${last.error}</span>` : ""}
+      ${avg !== null ? html`<span class="mono">${avg} ms</span>` : ""}
+      ${up !== null ? html`<span class="mono">${up} %</span>` : ""}
+      ${m.checked_at ? html`<span>${formatWhen(m.checked_at, tz, now)}</span>` : html`<span>Not checked yet</span>`}
+    </div>
+  </div>`;
+};
+
+const monitorForm = (c: Component, m: Monitor | undefined) => html`
+  <form method="post" action="/admin/components/${c.id}/monitor" class="monitor-form">
+    <h3>${icon.pulse} Monitor</h3>
+    <div class="field"><label for="url${c.id}">Address</label><input id="url${c.id}" type="url" name="url" value="${m?.url ?? ""}" required maxlength="500" placeholder="https://example.com/"></div>
+    <div class="grid2">
+      <div class="field"><label for="kw${c.id}">Must contain</label><input id="kw${c.id}" type="text" name="keyword" value="${m?.keyword ?? ""}" maxlength="100"></div>
+      <div class="field"><label for="slow${c.id}">Slow after (ms)</label><input id="slow${c.id}" type="number" name="slow_ms" min="100" max="30000" step="100" value="${m?.slow_ms ?? SLOW_MS}"></div>
+    </div>
+    <div class="field stack" style="gap:8px">
+      <label class="check"><input type="checkbox" name="open_incidents"${!m || m.open_incidents ? " checked" : ""}> Open an incident when it's down</label>
+      <label class="check"><input type="checkbox" name="paused"${m?.paused ? " checked" : ""}> Paused</label>
+    </div>
+    <div class="row"><button class="btn small" type="submit">${m ? "Save monitor" : html`${icon.plus} Add monitor`}</button></div>
+  </form>
+  ${m
+    ? html`<div class="row" style="margin-top:8px">
+      <form method="post" action="/admin/components/${c.id}/monitor/check"><button class="btn small">${icon.pulse} Check now</button></form>
+      <form method="post" action="/admin/components/${c.id}/monitor/delete" data-confirm="Stop monitoring ${c.name}?"><button class="btn small danger">${icon.trash} Remove monitor</button></form>
+    </div>`
+    : ""}`;
+
+export const componentsPage = (p: {
+  admin: boolean;
+  flash?: string;
+  error?: string;
+  groups: readonly Group[];
+  sections: readonly Section[];
+  comps: readonly Component[];
+  monitors: ReadonlyMap<number, Monitor>;
+  checks: ReadonlyMap<number, readonly Check[]>;
+  tz: string;
+  now: Date;
+}) => {
   const groupOptions = (current: number | null) =>
     html`<option value="">No group</option>${p.groups.map((g) => html`<option value="${g.id}"${g.id === current ? " selected" : ""}>${g.name}</option>`)}`;
   const ids = (sec: Section) => sec.components.map((c) => c.id);
@@ -272,6 +336,7 @@ ${notice(p.flash)}${notice(p.error, "error")}
         (c, ci) => html`<li style="align-items:flex-start">
         <div class="grow">
           <div class="row"><b style="font-weight:650">${c.name}</b>${c.description ? html`<span class="sub">${c.description}</span>` : ""}</div>
+          ${p.monitors.has(c.id) ? monitorLine(p.monitors.get(c.id)!, p.checks.get(c.id) ?? [], p.tz, p.now) : ""}
           <details class="edit" style="margin-top:4px"><summary>${icon.edit} Edit</summary>
             <form method="post" action="/admin/components/${c.id}">
               <div class="grid2"><div class="field"><label>Name</label><input type="text" name="name" value="${c.name}" required maxlength="80"></div>
@@ -280,6 +345,7 @@ ${notice(p.flash)}${notice(p.error, "error")}
               <div class="row"><button class="btn small" type="submit">Save</button></div>
             </form>
             <form method="post" action="/admin/components/${c.id}/delete" data-confirm="Delete ${c.name} and its uptime history?" style="margin-top:8px"><button class="btn small danger">${icon.trash} Delete</button></form>
+            ${monitorForm(c, p.monitors.get(c.id))}
           </details>
         </div>
         ${loose ? "" : moveBtns(`/admin/components/${c.id}/move`, ci === 0, ci === ids(sec).length - 1)}

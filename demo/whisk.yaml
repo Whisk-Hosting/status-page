@@ -23,6 +23,9 @@ functions:
   - name: notify-subscribers
     event: update.posted
     graph: workflows/notify-subscribers.graph.yaml
+  - name: monitor
+    cron: "0-59/3 * * * *"
+    graph: workflows/monitor.graph.yaml
   - name: tidy
     cron: "30 3 * * *"
     tz: America/New_York

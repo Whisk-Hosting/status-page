@@ -1,4 +1,5 @@
 // Background work. Step names match workflows/*.graph.yaml.
+import { runChecks } from "./checks.js";
 import { demoFunctions } from "./demo.js";
 import { BATCH, queueUpdate, sendBatch } from "./notify.js";
 import * as store from "./store.js";
@@ -19,9 +20,19 @@ export const notifySubscribers = inngest.createFunction(
   },
 );
 
-// Every night: addresses that never confirmed within a week are dropped.
-export const tidy = inngest.createFunction({ id: "tidy", triggers: [{ cron: "30 3 * * *" }] }, async ({ step }) =>
-  step.run("drop-unconfirmed", () => store.dropUnconfirmed(new Date(Date.now() - 7 * 86_400_000))),
+// Every three minutes: check each monitored component (checks.ts). The schedule is in whisk.yaml
+// too; change both to check more or less often. Runs never overlap.
+export const monitor = inngest.createFunction(
+  { id: "monitor", triggers: [{ cron: "0-59/3 * * * *" }], concurrency: { limit: 1 }, retries: 0 },
+  async ({ step }) => step.run("check", () => runChecks()),
 );
 
-export const functions = [notifySubscribers, tidy, ...demoFunctions()];
+// Every night: addresses that never confirmed within a week are dropped, and checks older than a
+// week.
+export const tidy = inngest.createFunction({ id: "tidy", triggers: [{ cron: "30 3 * * *" }] }, async ({ step }) => {
+  const week = () => new Date(Date.now() - 7 * 86_400_000);
+  await step.run("drop-unconfirmed", () => store.dropUnconfirmed(week()));
+  await step.run("drop-old-checks", () => store.dropOldChecks(week()));
+});
+
+export const functions = [notifySubscribers, monitor, tidy, ...demoFunctions()];

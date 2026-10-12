@@ -199,7 +199,7 @@ footer.site .runs a { text-decoration: underline; text-underline-offset: 3px; }
 label { font-weight: 600; font-size: .92rem; display: block; margin-bottom: 6px; }
 .field { margin-bottom: 18px; }
 .hint { color: var(--muted); font-size: .82rem; margin-top: 5px; font-weight: 400; }
-input[type=text], input[type=email], input[type=url], input[type=date], input[type=time], input[type=search], select, textarea {
+input[type=text], input[type=email], input[type=url], input[type=number], input[type=date], input[type=time], input[type=search], select, textarea {
   width: 100%; font: 400 1rem/1.4 var(--font); color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 11px; padding: 11px 13px; }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
 textarea { min-height: 120px; resize: vertical; }
@@ -277,4 +277,11 @@ table.plain td { padding: 11px 20px; border-top: 1px solid var(--line); vertical
 .demo-bar button { background: rgb(255 255 255 / .18); border: 0; border-radius: 9px; padding: 6px 12px; font: 650 .85rem/1 var(--font); cursor: pointer; }
 .demo-card { margin: 0 0 22px; padding: 22px 24px; display: flex; gap: 18px; align-items: center; justify-content: space-between; flex-wrap: wrap; background: linear-gradient(135deg, var(--accent-soft), transparent 70%), var(--surface); }
 .demo-card h2 { margin: 0; font-size: 1.15rem; }
+
+/* Monitors on the components screen */
+.monitor { margin-top: 8px; display: grid; gap: 6px; }
+.checks { display: flex; align-items: flex-end; gap: 2px; height: 22px; }
+.checks i { flex: 0 0 6px; border-radius: 2px; background: var(--c); opacity: .85; }
+.monitor-form { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.monitor-form h3 { display: flex; gap: 8px; align-items: center; font-size: .95rem; margin: 0 0 12px; }
 `;

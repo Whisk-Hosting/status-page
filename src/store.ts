@@ -2,6 +2,7 @@
 // model.ts; decisions about them live there, not here.
 import { randomBytes } from "node:crypto";
 import { sql, type Tx } from "./db.js";
+import type { Check, Monitor, MonitorInput } from "./monitor.js";
 import { hashKey, type Change, type Component, type Group, type Incident, type Kind, type State, type Status, type Update } from "./model.js";
 
 export { sql };
@@ -124,15 +125,16 @@ export type NewIncident = Readonly<{
 
 // createIncident opens an incident (or schedules maintenance) with its first update, and sets
 // the statuses of the components it names, all at once. Answers the ids.
-export const createIncident = (n: NewIncident) =>
-  sql.begin(async (tx) => {
-    const [i] = await tx<{ id: number }[]>`insert into incidents (kind, title, impact, state, starts_at, ends_at, resolved_at, created_by)
-      values (${n.kind}, ${n.title}, ${n.impact}, ${n.state}, ${n.starts_at}, ${n.ends_at}, ${n.state === "resolved" ? new Date() : null}, ${n.author}) returning id`;
-    if (n.component_ids.length) await tx`insert into incident_components ${tx(n.component_ids.map((component_id) => ({ incident_id: i.id, component_id })))}`;
-    const [u] = await tx<{ id: number }[]>`insert into incident_updates (incident_id, state, body, notify, author) values (${i.id}, ${n.state}, ${n.body}, ${n.notify}, ${n.author}) returning id`;
-    await setStatuses(tx, n.statuses);
-    return { id: i.id, update_id: u.id };
-  });
+export const createIncident = (n: NewIncident) => sql.begin((tx) => insertIncident(tx, n));
+
+export const insertIncident = async (tx: Tx, n: NewIncident) => {
+  const [i] = await tx<{ id: number }[]>`insert into incidents (kind, title, impact, state, starts_at, ends_at, resolved_at, created_by)
+    values (${n.kind}, ${n.title}, ${n.impact}, ${n.state}, ${n.starts_at}, ${n.ends_at}, ${n.state === "resolved" ? new Date() : null}, ${n.author}) returning id`;
+  if (n.component_ids.length) await tx`insert into incident_components ${tx(n.component_ids.map((component_id) => ({ incident_id: i.id, component_id })))}`;
+  const [u] = await tx<{ id: number }[]>`insert into incident_updates (incident_id, state, body, notify, author) values (${i.id}, ${n.state}, ${n.body}, ${n.notify}, ${n.author}) returning id`;
+  await setStatuses(tx, n.statuses);
+  return { id: i.id, update_id: u.id };
+};
 
 export type NewUpdate = Readonly<{
   incident_id: number;
@@ -146,14 +148,15 @@ export type NewUpdate = Readonly<{
   closes: boolean;
 }>;
 
-export const addUpdate = (n: NewUpdate) =>
-  sql.begin(async (tx) => {
-    await tx`update incidents set state = ${n.state}, impact = ${n.impact},
-      resolved_at = case when ${n.closes} then coalesce(resolved_at, now()) else null end where id = ${n.incident_id}`;
-    const [u] = await tx<{ id: number }[]>`insert into incident_updates (incident_id, state, body, notify, author) values (${n.incident_id}, ${n.state}, ${n.body}, ${n.notify}, ${n.author}) returning id`;
-    await setStatuses(tx, n.statuses);
-    return u.id;
-  });
+export const addUpdate = (n: NewUpdate) => sql.begin((tx) => insertUpdate(tx, n));
+
+export const insertUpdate = async (tx: Tx, n: NewUpdate) => {
+  await tx`update incidents set state = ${n.state}, impact = ${n.impact},
+    resolved_at = case when ${n.closes} then coalesce(resolved_at, now()) else null end where id = ${n.incident_id}`;
+  const [u] = await tx<{ id: number }[]>`insert into incident_updates (incident_id, state, body, notify, author) values (${n.incident_id}, ${n.state}, ${n.body}, ${n.notify}, ${n.author}) returning id`;
+  await setStatuses(tx, n.statuses);
+  return u.id;
+};
 
 export const editIncident = (id: number, e: { title: string; component_ids: readonly number[]; starts_at: Date | null; ends_at: Date | null }) =>
   sql.begin(async (tx) => {
@@ -249,3 +252,32 @@ export const keyFor = async (key: string) => {
   const [k] = await sql<{ id: number; name: string }[]>`update api_keys set last_used_at = now() where hash = ${hashKey(key)} and revoked_at is null returning id, name`;
   return k;
 };
+
+// ----- Monitors -----
+
+const monitorCols = sql`component_id, url, keyword, slow_ms, open_incidents, paused, state, fails, since, checked_at, incident_id`;
+
+export const monitors = () => sql<Monitor[]>`select ${monitorCols} from monitors order by component_id`;
+export const monitorFor = async (componentId: number) => (await sql<Monitor[]>`select ${monitorCols} from monitors where component_id = ${componentId}`)[0];
+
+// saveMonitor adds or changes a component's monitor. A new address starts afresh.
+export const saveMonitor = (componentId: number, m: MonitorInput) =>
+  sql`insert into monitors (component_id, url, keyword, slow_ms, open_incidents, paused)
+    values (${componentId}, ${m.url}, ${m.keyword}, ${m.slow_ms}, ${m.open_incidents}, ${m.paused})
+    on conflict (component_id) do update set url = excluded.url, keyword = excluded.keyword, slow_ms = excluded.slow_ms,
+      open_incidents = excluded.open_incidents, paused = excluded.paused,
+      fails = case when monitors.url = excluded.url then monitors.fails else 0 end`;
+
+export const deleteMonitor = (componentId: number) => sql`delete from monitors where component_id = ${componentId}`;
+
+// The latest checks of each component, newest first.
+export const recentChecks = async (perComponent: number): Promise<ReadonlyMap<number, readonly Check[]>> => {
+  const rows = await sql<(Check & { component_id: number })[]>`
+    select component_id, at, ok, ms, error from (
+      select component_id, at, ok, ms, error, row_number() over (partition by component_id order by at desc) as n from checks
+    ) c where n <= ${perComponent} order by component_id, at desc`;
+  return rows.reduce((m, r) => m.set(r.component_id, [...(m.get(r.component_id) ?? []), { at: r.at, ok: r.ok, ms: r.ms, error: r.error }]), new Map<number, readonly Check[]>());
+};
+
+// Checks older than a week are dropped every night.
+export const dropOldChecks = async (olderThan: Date) => (await sql`delete from checks where at < ${olderThan}`).count;

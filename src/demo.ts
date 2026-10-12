@@ -47,7 +47,7 @@ export const demoRoutes = (app: Hono) => {
 
 // Every night: empty the app's own tables and write the sample again, the same one a first
 // install gets. Nothing is selected by name.
-const TABLES = ["emails", "api_keys", "subscribers", "incident_updates", "incident_components", "incidents", "status_changes", "components", "component_groups"];
+const TABLES = ["checks", "monitors", "emails", "api_keys", "subscribers", "incident_updates", "incident_components", "incidents", "status_changes", "components", "component_groups"];
 
 export const resetDemo = async (now = new Date()) =>
   sql.begin(async (tx) => {

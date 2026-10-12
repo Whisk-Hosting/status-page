@@ -3,7 +3,7 @@
 import { randomBytes } from "node:crypto";
 import type { Sql, Tx } from "./db.js";
 import { maintenanceState } from "./model.js";
-import { impliedChanges, sample } from "./sample.js";
+import { impliedChanges, sample, sampleChecks } from "./sample.js";
 
 export const writeSample = async (tx: Tx, now: Date) => {
   const s = sample(now);
@@ -36,6 +36,11 @@ export const writeSample = async (tx: Tx, now: Date) => {
       await tx`insert into status_changes (component_id, status, at) values (${ids.get(c.key)!}, ${c.status}, ${c.at})`;
       await tx`update components set status = ${c.status} where id = ${ids.get(c.key)!}`;
     }
+  }
+  for (const [n, m] of s.monitors.entries()) {
+    const id = ids.get(m.key)!;
+    await tx`insert into monitors (component_id, url, keyword, checked_at, since) values (${id}, ${m.url}, ${m.keyword}, ${now}, ${s.created})`;
+    await tx`insert into checks ${tx(sampleChecks(now, n).map((c) => ({ component_id: id, at: c.at, ok: true, ms: c.ms, error: "" })))}`;
   }
   for (const email of s.subscribers)
     await tx`insert into subscribers (email, token, confirmed_at, created_at) values (${email}, ${randomBytes(24).toString("base64url")}, ${s.created}, ${s.created})`;

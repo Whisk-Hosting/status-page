@@ -1,2 +1,3 @@
 steps:
   - id: drop-unconfirmed
+  - id: drop-old-checks

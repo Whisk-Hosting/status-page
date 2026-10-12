@@ -1,7 +1,7 @@
 # Status page
 
-A status page for your business: components with 90-day uptime bars, incidents with a timeline of
-updates, scheduled maintenance, email subscribers, an Atom feed and an API your monitors can use.
+A status page for your business: built-in monitoring, components with 90-day uptime bars, incidents
+with a timeline of updates, scheduled maintenance, email subscribers, an Atom feed and an API.
 It replaces Atlassian Statuspage or Instatus for most small businesses.
 
 ![The public status page: a Degraded performance banner, an open incident being monitored and an upcoming maintenance window](docs/screenshots/desktop.webp)
@@ -75,6 +75,18 @@ scheduled jobs, email and security already taken care of. This app is one of the
 - Maintenance is a window that shows as upcoming, in progress, then completed, worked out from the
   times. Components in a running window show as Under maintenance.
 
+**Monitoring**
+- Give any component an address to check, under Manage > Components. The app checks it every
+  three minutes: anything but a 2xx answer within ten seconds, or a page missing the text you
+  name, is a failure; an answer slower than you set is slow.
+- Two failures in a row mark the component Major outage and open an incident, emailing
+  subscribers. The first good check puts it back to Operational and resolves that incident with
+  how long it was down. Slow answers show as Degraded performance.
+- A status set by hand stays until the monitor next sees something different, and nothing changes
+  while a maintenance window covers the component.
+- Each monitored component shows its last 30 checks, average response time and uptime, with
+  Check now. Only public addresses are checked, never the app's own network.
+
 **Uptime**
 - Worked out from the history of component statuses: a major outage counts as down and a partial
   outage as 30 % down, as Statuspage counts it.
@@ -130,13 +142,15 @@ functions over read-only data, and the database, email and queue are thin shells
 
 ```
 src/model.ts          pure: statuses, the banner, maintenance state, uptime, time zones
+src/monitor.ts        pure: what a check found and what it changes on the page
+src/checks.ts         fetches each monitor's address and writes what monitor.ts decided
 src/forms.ts          pure: reading staff forms and API bodies into changes
 src/feeds.ts          pure: Atom, the badge, Statuspage-compatible JSON
 src/sample.ts         pure: the sample page, relative to now
 src/load.ts           gathers what a page needs, then works it out with model.ts
 src/store.ts          one small query per function
 src/notify.ts         confirmation and update emails, written down first, sent in batches
-src/functions.ts      notify-subscribers and the nightly tidy (Inngest, on Whisk's queue)
+src/functions.ts      notify-subscribers, the monitor and the nightly tidy (Inngest, on Whisk's queue)
 src/api.ts            /api/v1
 src/routes/           the public pages and the staff screens
 src/views/            layout, pages, styles, icons, the browser script
@@ -147,8 +161,10 @@ migrations/           plain SQL, run in order before each release
 Whisk provides sign-in (`X-Whisk-*` headers), the database, storage and image resizing for the
 logo, email, the queue and schedules, the bot challenge on public forms, and custom domains.
 
-**Why there is no built-in monitoring.** A check every minute keeps the app awake all day. Point
-any monitor (Uptime Kuma, Better Stack, a cron job) at the API instead.
+**How often it checks.** The monitor runs every three minutes (`0-59/3 * * * *` in `whisk.yaml` and
+`src/functions.ts`; change both to check more or less often). On Whisk's Free plan schedules run at
+most every ten minutes. Each run wakes the app briefly, and it sleeps again 30 seconds after.
+Another monitor (Better Stack, Uptime Kuma, a cron job) can still set statuses through the API.
 
 ## Run it locally
 

@@ -16,6 +16,10 @@ export type SampleIncident = Readonly<{
   minutes?: number;
   updates: readonly SampleUpdate[];
 }>;
+// Sample monitors check example.com and example.org, which are reserved for examples and always
+// answer. Point them at your own services under Manage > Components.
+export type SampleMonitor = Readonly<{ key: string; url: string; keyword: string }>;
+export type SampleCheck = Readonly<{ at: Date; ms: number }>;
 export type Sample = Readonly<{
   name: string;
   website_url: string;
@@ -24,6 +28,7 @@ export type Sample = Readonly<{
   created: Date;
   incidents: readonly SampleIncident[];
   subscribers: readonly string[];
+  monitors: readonly SampleMonitor[];
 }>;
 
 const DAY = 86_400_000;
@@ -162,6 +167,10 @@ export const sample = (now: Date): Sample => ({
       ],
     },
   ],
+  monitors: [
+    { key: "web", url: "https://example.com/", keyword: "Example Domain" },
+    { key: "api", url: "https://example.org/", keyword: "Example Domain" },
+  ],
   subscribers: ["ana@example.com", "ben@example.com", "chloe@example.com", "dev@example.com", "emma@example.com", "frank@example.com"],
 });
 
@@ -175,3 +184,11 @@ export const impliedChanges = (i: SampleIncident, now: Date): readonly Readonly<
     ...(end ? [{ key, status: "operational" as Status, at: new Date(i.start.getTime() + end.minutes * 60_000) }] : []),
   ]).filter((c) => c.at <= now);
 };
+
+// The last hour and a half of checks for a sample monitor, every three minutes, with response
+// times that wander a little, so the staff screen has something to show before the first run.
+export const sampleChecks = (now: Date, seed: number): readonly SampleCheck[] =>
+  Array.from({ length: 30 }, (_, i) => ({
+    at: new Date(now.getTime() - (i + 1) * 3 * 60_000),
+    ms: 140 + ((seed * 37 + i * 53) % 90) + (i % 7 === 3 ? 160 : 0),
+  }));
