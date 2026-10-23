@@ -46,8 +46,8 @@ const appApi = (path: string) => env("WHISK_QUEUE_URL").replace(/\/events$/, "")
 
 export type ApiError = { code: string; message: string; fix?: string };
 
-// whiskApi calls the Whisk API as this app, with a deadline. The service token rotates daily,
-// so it is read from the environment on every call.
+// whiskApi calls the Whisk API as this app, with a deadline and the service token from the
+// environment.
 export const whiskApi = async <T>(path: string, body?: unknown, method = body === undefined ? "GET" : "POST"): Promise<T> => {
   if (localOnly()) return (await localApi(path, body, method)) as T;
   const res = await fetch(appApi(path), {
